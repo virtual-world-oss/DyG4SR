@@ -5,7 +5,7 @@ import random
 from torch.utils.data import DataLoader
 
 from data_prepare import data_partition,NeighborFinder
-from model import PTGCN
+from model import PTGCN, DyG4SR
 from modules import TimeEncode,MergeLayer,time_encoding
 import pickle as pkl
 import os
@@ -295,6 +295,7 @@ if __name__=='__main__':
         ddygs = pkl.load(f)
     
     ddyg_neighor_finders = [NeighborFinder(ddyg) for ddyg in ddygs]
+    
     # ddyg_time_encoders = [time_encoding(config.time_dim) for ddyg in ddygs]
     # ddyg_MLPLayers = [MergeLayer(config.embed_dim, config.embed_dim, config.embed_dim, 1) for ddyg in ddygs]
     # ddyg_adj_user = [{user: ddyg[ddyg.user_id == user]['item_id'].tolist() for user in ddyg['user_id'].unique()} for ddyg in ddygs]
@@ -303,10 +304,9 @@ if __name__=='__main__':
     # ddyg_adj_item = [{item: ddyg[ddyg.item_id == item]['user_id'].tolist() for item in ddyg['item_id'].unique()} for ddyg in ddygs]
     # ddyg_adj_item_edge = [{item: ddyg[ddyg.item_id == item].index.tolist() for item in ddyg['item_id'].unique()} for ddyg in ddygs]
     # ddyg_adj_item_time = [{item: ddyg[ddyg.item_id == item]['timestamp'].tolist() for item in ddyg['item_id'].unique()} for ddyg in ddygs]
-    # ddygs
-    
     # ddyg_user_neig50 = [ddyg_neighor_finder.get_user_neighbor_ind_slice(a_users, edge_idx, max(config.n_degree), device) for ddyg_neighor_finder, ddyg in zip(ddyg_neighor_finders, ddygs)]
     # ddyg_item_neig50 = [ddyg_neighor_finder.get_item_neighbor_ind_slice(a_users, edge_idx, max(config.n_degree), device) for ddyg_neighor_finder, ddyg in zip(ddyg_neighor_finders, ddygs)]
+    
     ddyg_a_users = [np.array(ddyg['user_id']) for ddyg in ddygs]
     ddyg_a_items = [np.array(ddyg['item_id']) for ddyg in ddygs]
     ddyg_a_edges = [np.arange(0, len(ddyg_a_user)) for ddyg_a_user in ddyg_a_users]

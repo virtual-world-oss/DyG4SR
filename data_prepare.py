@@ -7,8 +7,9 @@ import random
 class NeighborFinder:
     def __init__(self, ratings):
 
+        ratings = ratings.reset_index(drop=True)
         self.ratings = np.array(ratings)
-        print(self.ratings.shape)
+        # print(self.ratings.shape)
         users = ratings['user_id'].unique()
         items = ratings['item_id'].unique()
         self.user_edgeidx = {cur_user: np.array(ratings[ratings.user_id == cur_user].index.tolist()) for cur_user in
