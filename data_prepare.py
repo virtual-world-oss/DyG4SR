@@ -8,7 +8,7 @@ class NeighborFinder:
     def __init__(self, ratings):
 
         self.ratings = np.array(ratings)
-
+        print(self.ratings.shape)
         users = ratings['user_id'].unique()
         items = ratings['item_id'].unique()
         self.user_edgeidx = {cur_user: np.array(ratings[ratings.user_id == cur_user].index.tolist()) for cur_user in
@@ -78,8 +78,14 @@ class NeighborFinder:
             his_len = len(self.user_edgeidx[source_idx[i]][:idx])
             used_len = his_len if his_len <= n_neighbors else n_neighbors
 
-            adj_user[i, n_neighbors - used_len:] = self.ratings[:, 1][
-                self.user_edgeidx[source_idx[i].item()][idx - used_len:idx]]
+            try:
+                adj_user[i, n_neighbors - used_len:] = self.ratings[:, 1][
+                    self.user_edgeidx[source_idx[i].item()][idx - used_len:idx]]
+            except:
+                print(i)
+                print(idx, used_len, n_neighbors, self.user_edgeidx[source_idx[i]].shape, self.ratings[:, 1].shape)
+                print(self.user_edgeidx[source_idx[i]])
+                print(self.ratings[:, 1])
             user_time[i, n_neighbors - used_len:] = self.ratings[:, 2][
                 self.user_edgeidx[source_idx[i].item()][idx - used_len:idx]]
             user_mask[i, n_neighbors - used_len:] = 0
@@ -107,6 +113,65 @@ class NeighborFinder:
 
         return torch.from_numpy(adj_item).to(device), torch.from_numpy(adj_item_edge).to(device), torch.from_numpy(
             item_time).to(device), torch.from_numpy(item_mask).to(device)
+        
+    def get_user_neighbor_ind_slice(self, source_idx, edge_idx, n_neighbors, device):
+        adj_user = np.zeros((len(edge_idx), n_neighbors), dtype=np.int32)  # 表示每一个节点的邻居向量
+        user_mask = np.ones((len(edge_idx), n_neighbors), dtype=np.bool)
+        user_time = np.zeros((len(edge_idx), n_neighbors), dtype=np.int32)  # time matirx，节点与其他max_nodes的时间差
+        adj_user_edge = np.zeros((len(source_idx), n_neighbors), dtype=np.int32)
+
+        for i in range(len(edge_idx)):
+            idx = np.searchsorted(self.user_edgeidx[source_idx[i]], edge_idx[i]) + 1
+            his_len = len(self.user_edgeidx[source_idx[i]][:idx])
+            used_len = min(his_len, n_neighbors)  # 保证used_len不超过n_neighbors
+
+            # 确保数组长度匹配
+            adj_user_slice_length = len(adj_user[i, n_neighbors - used_len:])
+            ratings_slice = self.ratings[:, 1][self.user_edgeidx[source_idx[i].item()][idx - used_len:idx]]
+            adj_user[i, n_neighbors - used_len:] = ratings_slice[:adj_user_slice_length]
+
+            user_time_slice = self.ratings[:, 2][self.user_edgeidx[source_idx[i].item()][idx - used_len:idx]]
+            user_time[i, n_neighbors - used_len:] = user_time_slice[:adj_user_slice_length]
+
+            adj_user_edge_slice = self.user_edgeidx[source_idx[i].item()][idx - used_len:idx]
+            adj_user_edge[i, n_neighbors - used_len:] = adj_user_edge_slice[:adj_user_slice_length]
+
+            user_mask[i, n_neighbors - used_len:] = 0
+            
+        return torch.from_numpy(adj_user).to(device), torch.from_numpy(adj_user_edge).to(device), torch.from_numpy(
+            user_time).to(device), torch.from_numpy(user_mask).to(device)
+        
+        
+    def get_item_neighbor_ind_slice(self, destination_idx, edge_idx, n_neighbors, device):
+        adj_item = np.zeros((len(destination_idx), n_neighbors), dtype=np.int32)  # Neighbor vector for each node
+        item_mask = np.ones((len(destination_idx), n_neighbors), dtype=np.bool)
+        item_time = np.zeros((len(destination_idx), n_neighbors), dtype=np.int32)  # Time difference matrix
+        adj_item_edge = np.zeros((len(destination_idx), n_neighbors), dtype=np.int32)
+
+        for i in range(len(destination_idx)):
+            idx = np.searchsorted(self.item_edgeidx[destination_idx[i]], edge_idx[i]) + 1
+            his_len = len(self.item_edgeidx[destination_idx[i]][:idx])
+            used_len = min(his_len, n_neighbors)  # Ensure used_len does not exceed n_neighbors
+
+            # Ensure array lengths match before assignment
+            adj_item_slice_length = len(adj_item[i, n_neighbors - used_len:])
+            ratings_slice = self.ratings[:, 0][self.item_edgeidx[destination_idx[i]][idx - used_len:idx]]
+            adj_item[i, n_neighbors - used_len:] = ratings_slice[:adj_item_slice_length]
+
+            item_time_slice = self.ratings[:, 2][self.item_edgeidx[destination_idx[i]][idx - used_len:idx]]
+            item_time[i, n_neighbors - used_len:] = item_time_slice[:adj_item_slice_length]
+
+            adj_item_edge_slice = self.item_edgeidx[destination_idx[i]][idx - used_len:idx]
+            adj_item_edge[i, n_neighbors - used_len:] = adj_item_edge_slice[:adj_item_slice_length]
+
+            item_mask[i, n_neighbors - used_len:] = 0  # Adjust mask as required
+
+        return (
+            torch.from_numpy(adj_item).to(device),
+            torch.from_numpy(adj_item_edge).to(device),
+            torch.from_numpy(item_time).to(device),
+            torch.from_numpy(item_mask).to(device)
+        )
 
 
 def data_partition(fname):

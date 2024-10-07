@@ -41,7 +41,9 @@ def get_ddygs_beauty_dense(ratings_path, num_shots):
     print(TIME_INTERVAL)
     NUM_SHOTS = num_shots
     
-    time_intervals = [(115084800, 446022650),(446022650, 458751029),(458751029, 471479408),(471479408, 484207787),(484207787, 497318400)]
+    # time_intervals = [(115084800, 446022650),(446022650, 458751029),(458751029, 471479408),(471479408, 484207787),(484207787, 497318400)]
+    # 465115218
+    time_intervals = [(115084800, 465115218),(465115218, 497318400)]
     ratings_shot = []
     time_list = []
     for interval in time_intervals:

@@ -290,13 +290,37 @@ if __name__=='__main__':
     ###########################################
     # for discrete dyg
     # ddyg: list, and each element is a subset of ratings with index unchanged
-    # ddygs = get_ddygs(ratings, config.num_shots)
+    print('Generating discrete dygs and related info')
+    with open(os.path.join(config.data_path, 'ddygs.pkl'), 'rb') as f:
+        ddygs = pkl.load(f)
     
-    # print(len(ddygs))
-    # for ddyg in ddygs:
-    #     print(ddyg.shape)
-    # exit()
+    ddyg_neighor_finders = [NeighborFinder(ddyg) for ddyg in ddygs]
+    # ddyg_time_encoders = [time_encoding(config.time_dim) for ddyg in ddygs]
+    # ddyg_MLPLayers = [MergeLayer(config.embed_dim, config.embed_dim, config.embed_dim, 1) for ddyg in ddygs]
+    # ddyg_adj_user = [{user: ddyg[ddyg.user_id == user]['item_id'].tolist() for user in ddyg['user_id'].unique()} for ddyg in ddygs]
+    # ddyg_adj_user_edge = [{user: ddyg[ddyg.user_id == user].index.tolist() for user in ddyg['user_id'].unique()} for ddyg in ddygs]
+    # ddyg_adj_user_time = [{user: ddyg[ddyg.user_id == user]['timestamp'].tolist() for user in ddyg['user_id'].unique()} for ddyg in ddygs]
+    # ddyg_adj_item = [{item: ddyg[ddyg.item_id == item]['user_id'].tolist() for item in ddyg['item_id'].unique()} for ddyg in ddygs]
+    # ddyg_adj_item_edge = [{item: ddyg[ddyg.item_id == item].index.tolist() for item in ddyg['item_id'].unique()} for ddyg in ddygs]
+    # ddyg_adj_item_time = [{item: ddyg[ddyg.item_id == item]['timestamp'].tolist() for item in ddyg['item_id'].unique()} for ddyg in ddygs]
+    # ddygs
+    
+    # ddyg_user_neig50 = [ddyg_neighor_finder.get_user_neighbor_ind_slice(a_users, edge_idx, max(config.n_degree), device) for ddyg_neighor_finder, ddyg in zip(ddyg_neighor_finders, ddygs)]
+    # ddyg_item_neig50 = [ddyg_neighor_finder.get_item_neighbor_ind_slice(a_users, edge_idx, max(config.n_degree), device) for ddyg_neighor_finder, ddyg in zip(ddyg_neighor_finders, ddygs)]
+    ddyg_a_users = [np.array(ddyg['user_id']) for ddyg in ddygs]
+    ddyg_a_items = [np.array(ddyg['item_id']) for ddyg in ddygs]
+    ddyg_a_edges = [np.arange(0, len(ddyg_a_user)) for ddyg_a_user in ddyg_a_users]
+    
+    ddyg_user_neig50 = [ddyg_neighor_finder.get_user_neighbor_ind(ddyg_a_user, ddyg_a_edge, max(config.n_degree), device) for ddyg_neighor_finder, ddyg_a_user, ddyg_a_edge in zip(ddyg_neighor_finders, ddyg_a_users, ddyg_a_edges)]
+    ddyg_item_neig50 = [ddyg_neighor_finder.get_item_neighbor_ind(ddyg_a_item, ddyg_a_edge, max(config.n_degree), device) for ddyg_neighor_finder, ddyg_a_item, ddyg_a_edge in zip(ddyg_neighor_finders, ddyg_a_items, ddyg_a_edges)]
+    # for i in range(len(ddygs)):
+    #     print(ddyg_a_users[i].shape, ddyg_a_items[i].shape, ddyg_a_edges[i].shape)
+    
+    print('pass')
+    exit()
     ###########################################
+    
+    
     
     criterion = torch.nn.CrossEntropyLoss(reduction='sum')
     
