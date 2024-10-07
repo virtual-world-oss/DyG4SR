@@ -11,6 +11,8 @@ import pickle as pkl
 import os
 from tqdm import tqdm
 
+# from utils import get_ddygs
+
 class Config(object):
     """config."""
     # data = 'Moivelens'
@@ -19,6 +21,7 @@ class Config(object):
     data_raw = False
     batch_size = 64 # batch_size = 256, origin=64, [64,128,256,1024]
     n_degree = [20,50]  #'Number of neighbors to sample'
+    num_shots = 30 # num_shots = 2, origin=2, [2,5,10]
     n_head = 4  #'Number of heads used in attention layer'
     n_epoch = 50 # n_epoch = 100 #'Number of epochs'
     n_layer = 2 #'Number of network layers'
@@ -249,6 +252,8 @@ if __name__=='__main__':
 
     print("Finishing Gen Dataset")
     # exit()
+    print(ratings.shape)
+    # exit()
     
     users = ratings['user_id'].unique()
     items = ratings['item_id'].unique() 
@@ -275,6 +280,23 @@ if __name__=='__main__':
     # 只保留每条交互，最近的50个邻居
     user_neig50 = neighor_finder.get_user_neighbor_ind(a_users, edge_idx, max(config.n_degree), device)
     item_neig50 = neighor_finder.get_item_neighbor_ind(a_items, edge_idx, max(config.n_degree), device)
+    
+    # for revise, 
+    # user_neig50, user_egdes50, user_neig_time50, user_neig_mask50 = user_neig50
+    # item_neig50, item_egdes50, item_neig_time50, item_neig_mask50 = item_neig50
+    # print(user_neig50.shape, item_neig50.shape, user_egdes50.shape, item_egdes50.shape, user_neig_mask50.shape, item_neig_mask50.shape)
+    # exit()
+    
+    ###########################################
+    # for discrete dyg
+    # ddyg: list, and each element is a subset of ratings with index unchanged
+    # ddygs = get_ddygs(ratings, config.num_shots)
+    
+    # print(len(ddygs))
+    # for ddyg in ddygs:
+    #     print(ddyg.shape)
+    # exit()
+    ###########################################
     
     criterion = torch.nn.CrossEntropyLoss(reduction='sum')
     
@@ -377,10 +399,10 @@ if __name__=='__main__':
     print('Epoch %d test' % epoch)
     model = PTGCN(user_neig50, item_neig50, num_users, num_items, 
                   time_encoder, config.n_layer, config.n_degree, config.node_dim, config.time_dim,
-                  config.embed_dim, device, config.n_head, config.dropout
+                  config.embed_dim, device, config.n_head, config.drop_out
                   ).to(device)
     model.load_state_dict(torch.load("model_full.pth"))
     model.eval()
     test_bl1 = DataLoader(test_data, 5, shuffle=True, pin_memory=True)
     # recall5, recall10, NDCG5, NDCG10 = evaluate(model, ratings, items, test_bl1, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device)
-    recall5, recall10, NDCG5, NDCG10 = evaluate(model, ratings, items, test_bl1, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device)
+    recall5, recall10, NDCG5, NDCG10 = evaluate_val(model, ratings, items, test_bl1, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device)

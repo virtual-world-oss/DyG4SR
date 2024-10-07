@@ -3,9 +3,6 @@ import torch.nn as nn
 from modules import TemporalAttentionLayer
 
 class PTGCN(nn.Module):
-    '''
-    Position enhanced and Time aware graph convolution
-    '''
     def __init__(self, user_neig50, item_neig50, num_users, num_items, time_encoder, n_layers, n_neighbors,
                n_node_features, n_time_features, embedding_dimension, device,
                n_heads=2, dropout=0.1):

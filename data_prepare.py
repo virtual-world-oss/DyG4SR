@@ -181,8 +181,12 @@ def data_partition(fname):
     user_ids_invmap = {id_: i for i, id_ in enumerate(users)}
     item_ids_invmap = {id_: i for i, id_ in enumerate(items)}
  
-    ratings['user_id'].replace(user_ids_invmap, inplace=True)
-    ratings['item_id'].replace(item_ids_invmap, inplace=True)
+    # ratings['user_id'].replace(user_ids_invmap, inplace=True)
+    # ratings['item_id'].replace(item_ids_invmap, inplace=True)
+    
+    ratings['user_id'] = ratings['user_id'].map(user_ids_invmap)
+    ratings['item_id'] = ratings['item_id'].map(item_ids_invmap)
+
 
     print('user_count:'+str(len(users))+','+'item_count:'+str(len(items)))
     print('avr of user:'+str(ratings['user_id'].value_counts().mean())+'avr of item:'+str(ratings['item_id'].value_counts().mean()))
@@ -195,7 +199,6 @@ def data_partition(fname):
     ratings = ratings.sort_values(by='timestamp',ascending=True)  
     
     ratings = ratings.reset_index(drop=True)
-    
     
     
     full_data = []
