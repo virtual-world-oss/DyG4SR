@@ -21,7 +21,7 @@ class Config(object):
     data_raw = False
     batch_size = 64 # batch_size = 256, origin=64, [64,128,256,1024]
     n_degree = [20,50]  #'Number of neighbors to sample'
-    num_shots = 30 # num_shots = 2, origin=2, [2,5,10]
+    num_shots = 2 # num_shots = 2, origin=2, [2,5,10]
     n_head = 4  #'Number of heads used in attention layer'
     n_epoch = 50 # n_epoch = 100 #'Number of epochs'
     n_layer = 2 #'Number of network layers'
@@ -294,6 +294,10 @@ if __name__=='__main__':
     with open(os.path.join(config.data_path, 'ddygs.pkl'), 'rb') as f:
         ddygs = pkl.load(f)
     
+    ddyg_edges_idx = [[min(ddyg.index),max(ddyg.index)] for ddyg in ddygs]
+    # for ddyg in ddygs:
+    #     ddyg_index = ddyg.index
+    # exit()
     ddyg_neighor_finders = [NeighborFinder(ddyg) for ddyg in ddygs]
     
     # ddyg_time_encoders = [time_encoding(config.time_dim) for ddyg in ddygs]
@@ -316,19 +320,18 @@ if __name__=='__main__':
     # for i in range(len(ddygs)):
     #     print(ddyg_a_users[i].shape, ddyg_a_items[i].shape, ddyg_a_edges[i].shape)
     
-    print('pass')
-    exit()
+    # print('pass')
+    # exit()
     ###########################################
-    
-    
     
     criterion = torch.nn.CrossEntropyLoss(reduction='sum')
     
-    model = PTGCN(user_neig50, item_neig50, num_users, num_items,
+    model = DyG4SR(user_neig50, item_neig50, ddyg_user_neig50, ddyg_item_neig50, config.num_shots, ddyg_edges_idx,
+                 num_users, num_items,
                  time_encoder, config.n_layer,  config.n_degree, config.node_dim, config.time_dim,
                  config.embed_dim, device, config.n_head, config.drop_out
                  ).to(device)
-  
+
     optim = torch.optim.Adam(model.parameters(),lr=config.lr)
 
     num_params = 0
@@ -369,9 +372,17 @@ if __name__=='__main__':
 
             time0 = time.time()
 
+            # print('calculate embeddings')
+            
             user_embeddings = model(b_users, b_user_edge, timestamps, config.n_layer, nodetype='user')
+            # print("finish calculating user embeddings")
             item_embeddings = model(b_items, b_item_edge, timestamps, config.n_layer, nodetype='item')
+            # print("finish calculating item embeddings")
             negs_embeddings = model(negative_samples, neg_edge, timestamps, config.n_layer, nodetype='item')
+            # print("finish calculating negs embeddings")
+            
+            # print('pass')
+            # exit()
             
             with torch.no_grad():
                 labels = torch.zeros(count, dtype=torch.long).to(device)
@@ -421,10 +432,11 @@ if __name__=='__main__':
 
     # torch.save(model.state_dict(), "model_full.pth")
     print('Epoch %d test' % epoch)
-    model = PTGCN(user_neig50, item_neig50, num_users, num_items, 
-                  time_encoder, config.n_layer, config.n_degree, config.node_dim, config.time_dim,
-                  config.embed_dim, device, config.n_head, config.drop_out
-                  ).to(device)
+    model = DyG4SR(user_neig50, item_neig50, ddyg_user_neig50, ddyg_item_neig50, config.num_shots,
+                 num_users, num_items,
+                 time_encoder, config.n_layer,  config.n_degree, config.node_dim, config.time_dim,
+                 config.embed_dim, device, config.n_head, config.drop_out
+                 ).to(device)
     model.load_state_dict(torch.load("model_full.pth"))
     model.eval()
     test_bl1 = DataLoader(test_data, 5, shuffle=True, pin_memory=True)
