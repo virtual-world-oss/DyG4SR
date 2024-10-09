@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from modules import TemporalAttentionLayer, TemporalTransformerConv
+from utils import contrastive_loss
 
 class DyG4SR(nn.Module):
     def __init__(self, user_neig50, item_neig50, ddyg_user_neig50, ddyg_item_neig50, shots_num, ddyg_edges_idx, num_users, num_items, time_encoder, n_layers, n_neighbors,
@@ -121,11 +122,17 @@ class DyG4SR(nn.Module):
         ddyg_node_embedding = []
         for idx in range(self.shots_num):
             ddyg_node_embedding.append(self.compute_ddyg_embedding_oneshots(nodes, edges, timestamps, n_layers, nodetype, idx))
+        cl_losses = []
+        for idx in range(self.shots_num):
+            if idx >= self.shots_num-1:
+                break
+            cl_losses.append(contrastive_loss(ddyg_node_embedding[idx], ddyg_node_embedding[(idx+1)]))
+        cl_loss = torch.mean(cl_losses)
         ddyg_node_embedding = torch.stack(ddyg_node_embedding, dim=0)
         ddyg_node_embedding = self.shotsfusion(ddyg_node_embedding).squeeze(0)
         # print(ddyg_node_embedding.shape)
         # exit()
-        return ddyg_node_embedding
+        return ddyg_node_embedding, cl_loss
     
     def compute_ddyg_embedding_oneshots(self, nodes, edges, timestamps, n_layers, nodetype='user', shot_idx=None):
         """
@@ -242,7 +249,10 @@ class DyG4SR(nn.Module):
         return node_embedding
 
     def forward(self, nodes, edges, timestamps, n_layers, nodetype='user'):
-        return self.compute_embedding(nodes, edges, timestamps, n_layers, nodetype), self.compute_ddyg_embedding(nodes, edges, timestamps, n_layers, nodetype)
+        global_node_embedding = self.compute_embedding(nodes, edges, timestamps, n_layers, nodetype)
+        local_node_embedding, cl_loss = self.compute_ddyg_embedding(nodes, edges, timestamps, n_layers, nodetype)
+        node_embedding = torch.mean(global_node_embedding, local_node_embedding, dim=1)
+        return node_embedding, cl_loss
         
 
 

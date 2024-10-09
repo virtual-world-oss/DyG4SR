@@ -36,6 +36,8 @@ class Config(object):
     temperature = 0.07
     valid_batch_size = 64
     test_batch_size = 64
+    lambda1 = 0.01
+    lambda2 = 0.01
     
 def evaluate_val(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device):
      # 准备工作
@@ -72,8 +74,8 @@ def evaluate_val(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_us
             neg_edge = torch.from_numpy(neg_edge).to(device)
             edge_set = torch.cat([b_item_edge.view(-1,1),neg_edge], dim=1) #batch, 101
             
-            user_embeddings = model(b_users, b_user_edge,timestamps, config.n_layer, nodetype='user')[1]
-            itemset_embeddings = model(item_set.flatten(), edge_set.flatten(), timestamps_set.flatten(), config.n_layer, nodetype='item')[1]
+            user_embeddings, _ = model(b_users, b_user_edge,timestamps, config.n_layer, nodetype='user')
+            itemset_embeddings, _ = model(item_set.flatten(), edge_set.flatten(), timestamps_set.flatten(), config.n_layer, nodetype='item')
             itemset_embeddings = itemset_embeddings.view(count, 101, -1)
             
             logits = torch.bmm(user_embeddings.unsqueeze(1), itemset_embeddings.permute(0,2,1)).squeeze(1) # [count,101]
@@ -131,7 +133,7 @@ def evaluate(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_t
             neg_edge = torch.from_numpy(neg_edge).to(device)
             edge_set = torch.cat([b_item_edge.view(-1,1),neg_edge], dim=1) #batch, 101
             
-            user_embeddings = model(b_users, b_user_edge,timestamps, config.n_layer, nodetype='user')[1]
+            user_embeddings, _ = model(b_users, b_user_edge,timestamps, config.n_layer, nodetype='user')
             
             item_set_list = torch.split(item_set, test_batch_size, dim=1)
             edge_set_list = torch.split(edge_set, test_batch_size, dim=1)
@@ -139,7 +141,7 @@ def evaluate(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_t
             
             itemset_embeddings = []
             for i in range(len(item_set_list)):
-                tmp_itemset_embeddings = model(item_set_list[i].flatten(), edge_set_list[i].flatten(), timestamps_set_list[i].flatten(), config.n_layer, nodetype='item')[1]
+                tmp_itemset_embeddings, _ = model(item_set_list[i].flatten(), edge_set_list[i].flatten(), timestamps_set_list[i].flatten(), config.n_layer, nodetype='item')
                 itemset_embeddings.append(tmp_itemset_embeddings.view(count, -1, config.embed_dim))
             itemset_embeddings = torch.cat(itemset_embeddings, dim=1)
 
@@ -349,17 +351,17 @@ if __name__=='__main__':
     # print('Epoch %d test' % epoch)
     ###################################################################################################################
     # 直接加载测试，少用
-    model = DyG4SR(user_neig50, item_neig50, ddyg_user_neig50, ddyg_item_neig50, config.num_shots, ddyg_edges_idx,
-                 num_users, num_items,
-                 time_encoder, config.n_layer,  config.n_degree, config.node_dim, config.time_dim,
-                 config.embed_dim, device, config.n_head, config.drop_out
-                 ).to(device)
-    model.load_state_dict(torch.load("model_full.pth"))
-    model.eval()
-    test_bl1 = DataLoader(test_data, 5, shuffle=True, pin_memory=True)
-    # recall5, recall10, NDCG5, NDCG10 = evaluate(model, ratings, items, test_bl1, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device)
-    recall5, recall10, NDCG5, NDCG10 = evaluate_val(model, ratings, items, test_bl1, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device)
-    exit()
+    # model = DyG4SR(user_neig50, item_neig50, ddyg_user_neig50, ddyg_item_neig50, config.num_shots, ddyg_edges_idx,
+    #              num_users, num_items,
+    #              time_encoder, config.n_layer,  config.n_degree, config.node_dim, config.time_dim,
+    #              config.embed_dim, device, config.n_head, config.drop_out
+    #              ).to(device)
+    # model.load_state_dict(torch.load("model_full.pth"))
+    # model.eval()
+    # test_bl1 = DataLoader(test_data, 5, shuffle=True, pin_memory=True)
+    # # recall5, recall10, NDCG5, NDCG10 = evaluate(model, ratings, items, test_bl1, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device)
+    # recall5, recall10, NDCG5, NDCG10 = evaluate_val(model, ratings, items, test_bl1, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device)
+    # exit()
     ##################################################################################################################
     
     itrs = 0
@@ -394,11 +396,11 @@ if __name__=='__main__':
 
             # print('calculate embeddings')
             
-            user_embeddings = model(b_users, b_user_edge, timestamps, config.n_layer, nodetype='user')[1]
+            user_embeddings, user_cl_loss = model(b_users, b_user_edge, timestamps, config.n_layer, nodetype='user')
             # print("finish calculating user embeddings")
-            item_embeddings = model(b_items, b_item_edge, timestamps, config.n_layer, nodetype='item')[1]
+            item_embeddings, item_cl_loss = model(b_items, b_item_edge, timestamps, config.n_layer, nodetype='item')
             # print("finish calculating item embeddings")
-            negs_embeddings = model(negative_samples, neg_edge, timestamps, config.n_layer, nodetype='item')[1]
+            negs_embeddings, _ = model(negative_samples, neg_edge, timestamps, config.n_layer, nodetype='item')
             # print("finish calculating negs embeddings")
             
             # print('pass')
@@ -411,6 +413,8 @@ if __name__=='__main__':
             l_u = torch.bmm(user_embeddings.view(count, 1, -1), negs_embeddings.view(count, -1, 1)).view(count, 1) # [count,n_negs]           
             logits = torch.cat([l_pos, l_u], dim=1)  # [count, 2]
             loss = criterion(logits/config.temperature, labels)
+            
+            loss = loss + config.lambda1 * user_cl_loss + config.lambda1 * item_cl_loss
 
             loss.backward()
             optim.step()

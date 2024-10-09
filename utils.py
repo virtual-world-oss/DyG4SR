@@ -5,6 +5,36 @@ import os
 import random
 import pickle as pkl
 
+import torch
+import torch.nn.functional as F
+
+def contrastive_loss(X, Y):
+    """
+    计算两个 BxD 矩阵的 InfoNCE 对比学习损失。
+    
+    Args:
+        X (torch.Tensor): 第一个形状为 (B, D) 的tensor, 表示 B 个样本的 embedding。
+        Y (torch.Tensor): 第二个形状为 (B, D) 的tensor, 表示 B 个样本的 embedding。
+        
+    Returns:
+        loss (torch.Tensor): InfoNCE 损失。
+    """
+    B, D = X.shape
+
+    # 1. 计算正例相似度 (同一行)
+    # positive_sim = F.cosine_similarity(X, Y)  # 返回形状为 (B,)
+    # 2. 计算负例相似度 (不同行)
+    similarity_matrix = torch.mm(X, Y.t())  # 形状为 (B, B)
+    # 3. 构建 InfoNCE 损失
+    labels = torch.arange(B).to(X.device)  # 正样本的索引，形状为 (B,)
+
+    # 4. 使用 Cross Entropy 损失计算
+    loss = F.cross_entropy(similarity_matrix, labels)
+
+    return loss
+
+
+
 def get_ddygs_beauty(ratings_path, num_shots):
     with open(ratings_path, 'rb') as f:
         ratings = pkl.load(f)
