@@ -50,7 +50,7 @@ def evaluate_val(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_us
         model = model.eval()
         
         # for ix,batch in tqdm(enumerate(dl), total=len(dl), desc="validation"):
-        for ix,batch in enumerate(dl):
+        for ix,batch in enumerate(tqdm(dl)):
             #if ix%100==0:
                # print('batch:',ix)
             count = len(batch)
@@ -72,8 +72,8 @@ def evaluate_val(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_us
             neg_edge = torch.from_numpy(neg_edge).to(device)
             edge_set = torch.cat([b_item_edge.view(-1,1),neg_edge], dim=1) #batch, 101
             
-            user_embeddings = model(b_users, b_user_edge,timestamps, config.n_layer, nodetype='user')
-            itemset_embeddings = model(item_set.flatten(), edge_set.flatten(), timestamps_set.flatten(), config.n_layer, nodetype='item')
+            user_embeddings = model(b_users, b_user_edge,timestamps, config.n_layer, nodetype='user')[1]
+            itemset_embeddings = model(item_set.flatten(), edge_set.flatten(), timestamps_set.flatten(), config.n_layer, nodetype='item')[1]
             itemset_embeddings = itemset_embeddings.view(count, 101, -1)
             
             logits = torch.bmm(user_embeddings.unsqueeze(1), itemset_embeddings.permute(0,2,1)).squeeze(1) # [count,101]
@@ -131,7 +131,7 @@ def evaluate(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_t
             neg_edge = torch.from_numpy(neg_edge).to(device)
             edge_set = torch.cat([b_item_edge.view(-1,1),neg_edge], dim=1) #batch, 101
             
-            user_embeddings = model(b_users, b_user_edge,timestamps, config.n_layer, nodetype='user')
+            user_embeddings = model(b_users, b_user_edge,timestamps, config.n_layer, nodetype='user')[1]
             
             item_set_list = torch.split(item_set, test_batch_size, dim=1)
             edge_set_list = torch.split(edge_set, test_batch_size, dim=1)
@@ -139,7 +139,7 @@ def evaluate(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_t
             
             itemset_embeddings = []
             for i in range(len(item_set_list)):
-                tmp_itemset_embeddings = model(item_set_list[i].flatten(), edge_set_list[i].flatten(), timestamps_set_list[i].flatten(), config.n_layer, nodetype='item')
+                tmp_itemset_embeddings = model(item_set_list[i].flatten(), edge_set_list[i].flatten(), timestamps_set_list[i].flatten(), config.n_layer, nodetype='item')[1]
                 itemset_embeddings.append(tmp_itemset_embeddings.view(count, -1, config.embed_dim))
             itemset_embeddings = torch.cat(itemset_embeddings, dim=1)
 
@@ -342,6 +342,10 @@ if __name__=='__main__':
     # 训练集分为不同batch
     dl = DataLoader(train_data, config.batch_size, shuffle=True, pin_memory=True)
     
+    # val_bl = DataLoader(valid_data, 5, shuffle=True, pin_memory=True)
+    # recall5, recall10, NDCG5, NDCG10 = evaluate_val(model, ratings, items, val_bl, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device)
+    # exit()    
+        
     itrs = 0
     sum_loss=0
     for epoch in range(config.n_epoch):
@@ -374,11 +378,11 @@ if __name__=='__main__':
 
             # print('calculate embeddings')
             
-            user_embeddings = model(b_users, b_user_edge, timestamps, config.n_layer, nodetype='user')
+            user_embeddings = model(b_users, b_user_edge, timestamps, config.n_layer, nodetype='user')[1]
             # print("finish calculating user embeddings")
-            item_embeddings = model(b_items, b_item_edge, timestamps, config.n_layer, nodetype='item')
+            item_embeddings = model(b_items, b_item_edge, timestamps, config.n_layer, nodetype='item')[1]
             # print("finish calculating item embeddings")
-            negs_embeddings = model(negative_samples, neg_edge, timestamps, config.n_layer, nodetype='item')
+            negs_embeddings = model(negative_samples, neg_edge, timestamps, config.n_layer, nodetype='item')[1]
             # print("finish calculating negs embeddings")
             
             # print('pass')

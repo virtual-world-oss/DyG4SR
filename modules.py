@@ -4,6 +4,8 @@ import numpy as np
 import math
 import torch.nn.init as init
 import torch.nn.functional as F
+from torch_geometric.nn.inits import glorot
+from torch.nn import Parameter
 
 class PositionalEncoding(nn.Module):
     def __init__(self, dim_model, max_length=2000):
@@ -48,6 +50,30 @@ class TimeEncode(torch.nn.Module):
     #output = output.unsqueeze(1)
     
     return output
+
+class TemporalTransformerConv(nn.Module):
+    def __init__(self, embedding_dim):
+        super(TemporalTransformerConv, self).__init__()
+        self.nout = embedding_dim
+        self.transformer = nn.TransformerEncoder(nn.TransformerEncoderLayer(d_model=self.nout, nhead=8), num_layers=6)
+        # self.Q = Parameter(torch.ones((args.nout, args.nhid)).to(args.device), requires_grad=True)
+        # self.r = Parameter(torch.ones((args.nhid, 1)).to(args.device), requires_grad=True)
+        # for p in self.transformer.parameters():
+        #     if p.dim() > 1:
+        #         glorot(p)
+        # glorot(self.Q)
+        # glorot(self.r)
+
+    def forward(self, x):
+        out = self.transformer(x)
+        # last hidden
+        history_agg = out[-1,:,:].unsqueeze(0)
+        # att pooling
+        # att = torch.matmul(torch.tanh(torch.matmul(out, self.Q)), self.r)
+        # att = F.softmax(att, dim=0)
+        # history_agg = torch.mean(att * out, dim=0).unsqueeze(0)
+        return history_agg
+
 
 class time_encoding(nn.Module):
     # Time Encoding proposed by TGAT

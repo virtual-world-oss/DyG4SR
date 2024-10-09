@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from modules import TemporalAttentionLayer
+from modules import TemporalAttentionLayer, TemporalTransformerConv
 
 class DyG4SR(nn.Module):
     def __init__(self, user_neig50, item_neig50, ddyg_user_neig50, ddyg_item_neig50, shots_num, ddyg_edges_idx, num_users, num_items, time_encoder, n_layers, n_neighbors,
@@ -32,7 +32,9 @@ class DyG4SR(nn.Module):
         
         self.ddyg_user_neig50, self.ddyg_user_egdes50, self.ddyg_user_neig_time50, self.ddyg_user_neig_mask50 = [list(t) for t in zip(*ddyg_user_neig50)]
         self.ddyg_item_neig50, self.ddyg_item_egdes50, self.ddyg_item_neig_time50, self.ddyg_item_neig_mask50 = [list(t) for t in zip(*ddyg_item_neig50)]
-    
+
+        self.shotsfusion = TemporalTransformerConv(self.embedding_dimension)
+        
         self.attention_models = torch.nn.ModuleList([TemporalAttentionLayer(
             n_node_features=n_node_features,
             n_neighbors_features=n_node_features,
@@ -119,6 +121,10 @@ class DyG4SR(nn.Module):
         ddyg_node_embedding = []
         for idx in range(self.shots_num):
             ddyg_node_embedding.append(self.compute_ddyg_embedding_oneshots(nodes, edges, timestamps, n_layers, nodetype, idx))
+        ddyg_node_embedding = torch.stack(ddyg_node_embedding, dim=0)
+        ddyg_node_embedding = self.shotsfusion(ddyg_node_embedding).squeeze(0)
+        # print(ddyg_node_embedding.shape)
+        # exit()
         return ddyg_node_embedding
     
     def compute_ddyg_embedding_oneshots(self, nodes, edges, timestamps, n_layers, nodetype='user', shot_idx=None):
@@ -158,6 +164,8 @@ class DyG4SR(nn.Module):
             valid_mask = (edges_torch >= ddyg_edge_idx[0]) & (edges_torch <= ddyg_edge_idx[1])
             invalid_mask = ~valid_mask
             edges_torch = edges_torch[valid_mask]
+            if len(edges_torch)==0:
+                return node_features
             if not torch.min(edges_torch)-ddyg_edge_idx[0] < 0:
                 edges_torch = edges_torch - ddyg_edge_idx[0]
             nodes_torch = nodes_torch[valid_mask]
@@ -201,7 +209,7 @@ class DyG4SR(nn.Module):
             if nodetype=='item':
                 # adj, adge, times, mask = self.item_neig50[edges_torch,-n_neighbor:], self.item_egdes50[edges_torch,-n_neighbor:], self.item_neig_time50[edges_torch,-n_neighbor:], self.item_neig_mask50[edges_torch,-n_neighbor:]
                 # if shot_idx>=1:
-                #     print(f'max edge:{torch.max(edges_torch)}, min edge:{torch.min(edges_torch)}')
+                    # print(f'max edge:{torch.max(edges_torch)}, min edge:{torch.min(edges_torch)}')
                 adj, adge, times, mask = self.ddyg_item_neig50[shot_idx][edges_torch,-n_neighbor:], self.ddyg_item_egdes50[shot_idx][edges_torch,-n_neighbor:], self.ddyg_item_neig_time50[shot_idx][edges_torch,-n_neighbor:], self.ddyg_item_neig_mask50[shot_idx][edges_torch,-n_neighbor:]
                 # if shot_idx>=1:
                 #     print(f'edge shape:{adge.shape}')

@@ -1,0 +1,33 @@
+loading the dataset...
+Finishing Gen Dataset
+(198502, 3)
+Traceback (most recent call last):
+  File "/root/codes/PTGCN-main/main.py", line 262, in <module>
+    adj_user = {user: ratings[ratings.user_id == user]['item_id'].tolist() for user in users}
+  File "/root/codes/PTGCN-main/main.py", line 262, in <dictcomp>
+    adj_user = {user: ratings[ratings.user_id == user]['item_id'].tolist() for user in users}
+  File "/root/miniconda3/envs/pytorch_liu/lib/python3.10/site-packages/pandas/core/frame.py", line 3752, in __getitem__
+    return self._getitem_bool_array(key)
+  File "/root/miniconda3/envs/pytorch_liu/lib/python3.10/site-packages/pandas/core/frame.py", line 3811, in _getitem_bool_array
+    return self._take_with_is_copy(indexer, axis=0)
+  File "/root/miniconda3/envs/pytorch_liu/lib/python3.10/site-packages/pandas/core/generic.py", line 3948, in _take_with_is_copy
+    result = self._take(indices=indices, axis=axis)
+  File "/root/miniconda3/envs/pytorch_liu/lib/python3.10/site-packages/pandas/core/generic.py", line 3932, in _take
+    new_data = self._mgr.take(
+  File "/root/miniconda3/envs/pytorch_liu/lib/python3.10/site-packages/pandas/core/internals/managers.py", line 963, in take
+    return self.reindex_indexer(
+  File "/root/miniconda3/envs/pytorch_liu/lib/python3.10/site-packages/pandas/core/internals/managers.py", line 747, in reindex_indexer
+    new_blocks = [
+  File "/root/miniconda3/envs/pytorch_liu/lib/python3.10/site-packages/pandas/core/internals/managers.py", line 748, in <listcomp>
+    blk.take_nd(
+  File "/root/miniconda3/envs/pytorch_liu/lib/python3.10/site-packages/pandas/core/internals/blocks.py", line 945, in take_nd
+    new_values = algos.take_nd(
+  File "/root/miniconda3/envs/pytorch_liu/lib/python3.10/site-packages/pandas/core/array_algos/take.py", line 117, in take_nd
+    return _take_nd_ndarray(arr, indexer, axis, fill_value, allow_fill)
+  File "/root/miniconda3/envs/pytorch_liu/lib/python3.10/site-packages/pandas/core/array_algos/take.py", line 133, in _take_nd_ndarray
+    dtype, fill_value, mask_info = _take_preprocess_indexer_and_fill_value(
+  File "/root/miniconda3/envs/pytorch_liu/lib/python3.10/site-packages/pandas/core/array_algos/take.py", line 586, in _take_preprocess_indexer_and_fill_value
+    needs_masking = bool(mask.any())
+  File "/root/miniconda3/envs/pytorch_liu/lib/python3.10/site-packages/numpy/core/_methods.py", line 57, in _any
+    return umr_any(a, axis, dtype, out, keepdims)
+KeyboardInterrupt
