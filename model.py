@@ -127,7 +127,8 @@ class DyG4SR(nn.Module):
             if idx >= self.shots_num-1:
                 break
             cl_losses.append(contrastive_loss(ddyg_node_embedding[idx], ddyg_node_embedding[(idx+1)]))
-        cl_loss = torch.mean(cl_losses)
+        if len(cl_losses) > 0:
+            cl_loss = torch.mean(torch.stack(cl_losses))
         ddyg_node_embedding = torch.stack(ddyg_node_embedding, dim=0)
         ddyg_node_embedding = self.shotsfusion(ddyg_node_embedding).squeeze(0)
         # print(ddyg_node_embedding.shape)
@@ -251,7 +252,8 @@ class DyG4SR(nn.Module):
     def forward(self, nodes, edges, timestamps, n_layers, nodetype='user'):
         global_node_embedding = self.compute_embedding(nodes, edges, timestamps, n_layers, nodetype)
         local_node_embedding, cl_loss = self.compute_ddyg_embedding(nodes, edges, timestamps, n_layers, nodetype)
-        node_embedding = torch.mean(global_node_embedding, local_node_embedding, dim=1)
+        # node_embedding = torch.mean(global_node_embedding, local_node_embedding, dim=1)
+        node_embedding = (global_node_embedding + local_node_embedding) / 2
         return node_embedding, cl_loss
         
 
