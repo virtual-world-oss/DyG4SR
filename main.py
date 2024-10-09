@@ -26,7 +26,7 @@ class Config(object):
     n_epoch = 50 # n_epoch = 100 #'Number of epochs'
     n_layer = 2 #'Number of network layers'
     lr = 0.0001 # lr = 0.0005  #'Learning rate' origin=0.0001,[0.00003,0.0001,0.0003,0.0005]
-    patience = 25  #'Patience for early stopping' origin=25,[5,25]
+    patience = 5  #'Patience for early stopping' origin=25,[5,25]
     drop_out = 0.1  #'Dropout probability' origin=0.1, [0.1,0.3]
     gpu = 0,  #'Idx for the gpu to use'
     node_dim = 160  #'Dimensions of the node embedding' origin=160, [160,64]
