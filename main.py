@@ -346,6 +346,22 @@ if __name__=='__main__':
     # recall5, recall10, NDCG5, NDCG10 = evaluate_val(model, ratings, items, val_bl, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device)
     # exit()    
         
+    # print('Epoch %d test' % epoch)
+    ###################################################################################################################
+    # 直接加载测试，少用
+    model = DyG4SR(user_neig50, item_neig50, ddyg_user_neig50, ddyg_item_neig50, config.num_shots, ddyg_edges_idx,
+                 num_users, num_items,
+                 time_encoder, config.n_layer,  config.n_degree, config.node_dim, config.time_dim,
+                 config.embed_dim, device, config.n_head, config.drop_out
+                 ).to(device)
+    model.load_state_dict(torch.load("model_full.pth"))
+    model.eval()
+    test_bl1 = DataLoader(test_data, 5, shuffle=True, pin_memory=True)
+    # recall5, recall10, NDCG5, NDCG10 = evaluate(model, ratings, items, test_bl1, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device)
+    recall5, recall10, NDCG5, NDCG10 = evaluate_val(model, ratings, items, test_bl1, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device)
+    exit()
+    ##################################################################################################################
+    
     itrs = 0
     sum_loss=0
     for epoch in range(config.n_epoch):
@@ -436,7 +452,7 @@ if __name__=='__main__':
 
     # torch.save(model.state_dict(), "model_full.pth")
     print('Epoch %d test' % epoch)
-    model = DyG4SR(user_neig50, item_neig50, ddyg_user_neig50, ddyg_item_neig50, config.num_shots,
+    model = DyG4SR(user_neig50, item_neig50, ddyg_user_neig50, ddyg_item_neig50, config.num_shots, ddyg_edges_idx,
                  num_users, num_items,
                  time_encoder, config.n_layer,  config.n_degree, config.node_dim, config.time_dim,
                  config.embed_dim, device, config.n_head, config.drop_out
