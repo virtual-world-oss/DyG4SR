@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from modules import TemporalAttentionLayer, TemporalTransformerConv
+from modules import TemporalAttentionLayer, TemporalTransformerConv, AttentionFusion
 from utils import contrastive_loss
 
 class DyG4SR(nn.Module):
@@ -35,6 +35,7 @@ class DyG4SR(nn.Module):
         self.ddyg_item_neig50, self.ddyg_item_egdes50, self.ddyg_item_neig_time50, self.ddyg_item_neig_mask50 = [list(t) for t in zip(*ddyg_item_neig50)]
 
         self.shotsfusion = TemporalTransformerConv(self.embedding_dimension)
+        self.globallocalfusion = AttentionFusion(self.embedding_dimension)
         
         self.attention_models = torch.nn.ModuleList([TemporalAttentionLayer(
             n_node_features=n_node_features,
@@ -253,7 +254,8 @@ class DyG4SR(nn.Module):
         global_node_embedding = self.compute_embedding(nodes, edges, timestamps, n_layers, nodetype)
         local_node_embedding, cl_loss = self.compute_ddyg_embedding(nodes, edges, timestamps, n_layers, nodetype)
         # node_embedding = torch.mean(global_node_embedding, local_node_embedding, dim=1)
-        node_embedding = (global_node_embedding + local_node_embedding) / 2
+        # node_embedding = (global_node_embedding + local_node_embedding) / 2
+        node_embedding = self.globallocalfusion(global_node_embedding, local_node_embedding)
         return node_embedding, cl_loss
         
 

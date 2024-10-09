@@ -27,6 +27,60 @@ class PositionalEncoding(nn.Module):
             tensor: B x T
         """
         return self.pe[:, :maxlen]
+    
+    
+# class TimeEncodeco(torch.nn.Module):
+#     def __init__(self, expand_dim, factor=5):
+#         super(TimeEncodeco, self).__init__()
+#         #init_len = np.array([1e8**(i/(time_dim-1)) for i in range(time_dim)])
+        
+#         time_dim = expand_dim
+#         self.factor = factor
+#         self.basis_freq = torch.nn.Parameter((torch.from_numpy(1 / 10 ** np.linspace(0, 9, time_dim))).float())
+#         self.phase = torch.nn.Parameter(torch.zeros(time_dim).float())
+        
+#         #self.dense = torch.nn.Linear(time_dim, expand_dim, bias=False)
+
+#         #torch.nn.init.xavier_normal_(self.dense.weight)
+        
+#     def forward(self, ts):
+#         # ts: [N, L]
+#         batch_size = ts.size(0)
+#         seq_len = ts.size(1)
+                
+#         ts = ts.view(batch_size, seq_len, 1)# [N, L, 1]
+#         map_ts = ts * self.basis_freq.view(1, 1, -1) # [N, L, time_dim]
+#         map_ts += self.phase.view(1, 1, -1)
+        
+#         harmonic = torch.cos(map_ts)
+
+#         return harmonic #self.dense(harmonic)
+
+class TimeEncodeco(torch.nn.Module):
+    def __init__(self, expand_dim, factor=5):
+        super(TimeEncodeco, self).__init__()
+        
+        time_dim = expand_dim
+        self.factor = factor
+        self.basis_freq = torch.nn.Parameter((torch.from_numpy(1 / 10 ** np.linspace(0, 9, time_dim))).float())
+        self.phase = torch.nn.Parameter(torch.zeros(time_dim).float())
+        
+    def forward(self, ts):
+        # ts: [N], 输入是 [N] 而不是 [N, L]
+        batch_size = ts.size(0)
+        
+        # 将 [N] 转换为 [N, 1]，以便后续广播
+        ts = ts.view(batch_size, 1)  # [N, 1]
+
+        # 计算时间编码，将其扩展为 [N, time_dim]
+        map_ts = ts * self.basis_freq.view(1, -1)  # [N, time_dim]
+        map_ts += self.phase.view(1, -1)
+        
+        # 计算余弦编码
+        harmonic = torch.cos(map_ts)
+
+        return harmonic  # 返回的是 [N, time_dim]
+
 
 class TimeEncode(torch.nn.Module):
   # Time Encoding proposed by TGAT
@@ -50,6 +104,29 @@ class TimeEncode(torch.nn.Module):
     #output = output.unsqueeze(1)
     
     return output
+
+class AttentionFusion(torch.nn.Module):
+    def __init__(self, embed_dim):
+        super(AttentionFusion, self).__init__()
+        # 可学习的注意力权重
+        self.attention_weights = torch.nn.Parameter(torch.randn(2, embed_dim), requires_grad=True)
+        
+    def forward(self, global_embedding, local_embedding):
+        # 计算注意力得分
+        global_score = torch.sum(global_embedding * self.attention_weights[0], dim=1, keepdim=True)  # (B, 1)
+        local_score = torch.sum(local_embedding * self.attention_weights[1], dim=1, keepdim=True)    # (B, 1)
+
+        # 将注意力得分组合成权重
+        scores = torch.cat([global_score, local_score], dim=1)  # (B, 2)
+        attention_weights = F.softmax(scores, dim=1)  # 在第 1 维上做 softmax
+
+        # 融合 embedding
+        global_weighted = global_embedding * attention_weights[:, 0].unsqueeze(1)  # (B, D)
+        local_weighted = local_embedding * attention_weights[:, 1].unsqueeze(1)    # (B, D)
+
+        fused_embedding = global_weighted + local_weighted  # (B, D)
+        
+        return fused_embedding
 
 class TemporalTransformerConv(nn.Module):
     def __init__(self, embedding_dim):
