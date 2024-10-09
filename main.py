@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 
 from data_prepare import data_partition,NeighborFinder
 from model import PTGCN, DyG4SR
-from modules import TimeEncode,MergeLayer,time_encoding
+from modules import TimeEncode,MergeLayer,time_encoding,TimeEncodeco
 import pickle as pkl
 import os
 from tqdm import tqdm
@@ -271,7 +271,8 @@ if __name__=='__main__':
     num_users = len(users)
     num_items = len(items)
     neighor_finder = NeighborFinder(ratings)
-    time_encoder = time_encoding(config.time_dim)
+    # time_encoder = time_encoding(config.time_dim)
+    time_encoder = TimeEncodeco(config.time_dim)
     MLPLayer = MergeLayer(config.embed_dim, config.embed_dim, config.embed_dim, 1)
 
     a_users = np.array(ratings['user_id'])

@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from modules import TemporalAttentionLayer, TemporalTransformerConv, AttentionFusion
+from modules import TemporalAttentionLayer, TemporalTransformerConv, AttentionFusion, time_encoding
 from utils import contrastive_loss
 
 class DyG4SR(nn.Module):
@@ -36,6 +36,7 @@ class DyG4SR(nn.Module):
 
         self.shotsfusion = TemporalTransformerConv(self.embedding_dimension)
         self.globallocalfusion = AttentionFusion(self.embedding_dimension)
+        self.node_time_encoder = time_encoding(self.embedding_dimension)
         
         self.attention_models = torch.nn.ModuleList([TemporalAttentionLayer(
             n_node_features=n_node_features,
@@ -66,7 +67,9 @@ class DyG4SR(nn.Module):
 
         # query node always has the start time -> time span == 0
         #nodes_time_embedding = torch.matmul(self.time_encoder(torch.zeros_like(timestamps_torch)),self.time_embeddings(inx)).unsqueeze(1)
-        nodes_time_embedding = self.time_embeddings(self.time_encoder(torch.zeros_like(timestamps_torch)))
+        # nodes_time_embedding = self.time_embeddings(self.time_encoder(torch.zeros_like(timestamps_torch)))
+        nodes_time_embedding = self.time_embeddings(self.node_time_encoder(torch.zeros_like(timestamps_torch)))
+        # nodes_time_embedding = self.time_embeddings(torch.zeros_like(timestamps_torch).long())
         if nodetype=='user':
             node_features = self.user_embeddings(nodes_torch)
         else:
@@ -86,7 +89,10 @@ class DyG4SR(nn.Module):
 
                 neighbor_embeddings = self.compute_embedding(adj, adge, times, n_layers - 1, 'item')
                 neighbor_embeddings = neighbor_embeddings.view(len(nodes), n_neighbor, -1)
-                edge_time_embeddings = self.time_embeddings(self.time_encoder(edge_deltas.flatten()))
+                # origin
+                # edge_time_embeddings = self.time_embeddings(self.time_encoder(edge_deltas.flatten()))
+                # alter
+                edge_time_embeddings = self.time_encoder(edge_deltas.flatten())
                 #edge_time_embeddings = torch.matmul(self.time_encoder(edge_deltas.flatten()),self.time_embeddings(inx))
                 edge_time_embeddings = edge_time_embeddings.view(len(nodes), n_neighbor, -1)
 
@@ -107,7 +113,11 @@ class DyG4SR(nn.Module):
                 
                 neighbor_embeddings = self.compute_embedding(adj, adge, times, n_layers - 1, 'user')
                 neighbor_embeddings = neighbor_embeddings.view(len(nodes), n_neighbor, -1)
-                edge_time_embeddings = self.time_embeddings(self.time_encoder(edge_deltas.flatten()))
+                # origin
+                # edge_time_embeddings = self.time_embeddings(self.time_encoder(edge_deltas.flatten()))
+                # alter
+                edge_time_embeddings = self.time_encoder(edge_deltas.flatten())
+                
                 #edge_time_embeddings = torch.matmul(self.time_encoder(edge_deltas.flatten()),self.time_embeddings(inx))
                 edge_time_embeddings = edge_time_embeddings.view(len(nodes), n_neighbor, -1)
 
@@ -157,7 +167,9 @@ class DyG4SR(nn.Module):
         #nodes_time_embedding = torch.matmul(self.time_encoder(torch.zeros_like(timestamps_torch)),self.time_embeddings(inx)).unsqueeze(1)
         # print('nodes_time_embedding generating')
         # print(timestamps_torch.shape)
-        nodes_time_embedding = self.time_embeddings(self.time_encoder(torch.zeros_like(timestamps_torch)))
+        # nodes_time_embedding = self.time_embeddings(self.time_encoder(torch.zeros_like(timestamps_torch)))
+        nodes_time_embedding = self.time_embeddings(self.node_time_encoder(torch.zeros_like(timestamps_torch)))
+        # nodes_time_embedding = self.time_embeddings(torch.zeros_like(timestamps_torch).long())
         if nodetype=='user':
             node_features = self.user_embeddings(nodes_torch)
         else:
@@ -203,7 +215,10 @@ class DyG4SR(nn.Module):
                 neighbor_embeddings = self.compute_ddyg_embedding_oneshots(adj, adge, times, n_layers - 1, 'item',shot_idx=shot_idx)
                 # print('user exit')
                 neighbor_embeddings = neighbor_embeddings.view(len(nodes_torch), n_neighbor, -1)
-                edge_time_embeddings = self.time_embeddings(self.time_encoder(edge_deltas.flatten()))
+                # origin
+                # edge_time_embeddings = self.time_embeddings(self.time_encoder(edge_deltas.flatten()))
+                # alter
+                edge_time_embeddings = self.time_encoder(edge_deltas.flatten())
                 #edge_time_embeddings = torch.matmul(self.time_encoder(edge_deltas.flatten()),self.time_embeddings(inx))
                 edge_time_embeddings = edge_time_embeddings.view(len(nodes_torch), n_neighbor, -1)
 
@@ -234,7 +249,10 @@ class DyG4SR(nn.Module):
                 neighbor_embeddings = self.compute_ddyg_embedding_oneshots(adj, adge, times, n_layers - 1, 'user',shot_idx=shot_idx)
                 # print('item exit')
                 neighbor_embeddings = neighbor_embeddings.view(len(nodes_torch), n_neighbor, -1)
-                edge_time_embeddings = self.time_embeddings(self.time_encoder(edge_deltas.flatten()))
+                # origin
+                # edge_time_embeddings = self.time_embeddings(self.time_encoder(edge_deltas.flatten()))
+                # alter
+                edge_time_embeddings = self.time_encoder(edge_deltas.flatten())
                 #edge_time_embeddings = torch.matmul(self.time_encoder(edge_deltas.flatten()),self.time_embeddings(inx))
                 edge_time_embeddings = edge_time_embeddings.view(len(nodes_torch), n_neighbor, -1)
 
