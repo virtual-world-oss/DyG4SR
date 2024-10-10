@@ -4,7 +4,7 @@ import numpy as np
 import random
 from torch.utils.data import DataLoader
 
-from data_prepare import data_partition,NeighborFinder
+from data_prepare import data_partition,NeighborFinder, pre_train_dataset
 from model import PTGCN, DyG4SR
 from modules import TimeEncode,MergeLayer,time_encoding,TimeEncodeco
 import pickle as pkl
@@ -36,8 +36,12 @@ class Config(object):
     temperature = 0.07
     valid_batch_size = 64
     test_batch_size = 64
-    lambda1 = 0.01
-    lambda2 = 0.01
+    lambda1 = 0.3
+    lambda2 = 0.3
+    positive_num = 5
+    negative_num = 15
+    week_num = 5
+    pre_train_epochs = 3
     
 def evaluate_val(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device):
      # 准备工作
@@ -52,7 +56,7 @@ def evaluate_val(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_us
         model = model.eval()
         
         # for ix,batch in tqdm(enumerate(dl), total=len(dl), desc="validation"):
-        for ix,batch in enumerate(tqdm(dl)):
+        for ix,batch in enumerate(dl):
             #if ix%100==0:
                # print('batch:',ix)
             count = len(batch)
@@ -252,6 +256,7 @@ if __name__=='__main__':
         with open(os.path.join(config.data_path, 'item_ids_invmap.pkl'), 'rb') as f:
             item_ids_invmap = pkl.load(f)
 
+
     print("Finishing Gen Dataset")
     # exit()
     print(ratings.shape)
@@ -271,8 +276,8 @@ if __name__=='__main__':
     num_users = len(users)
     num_items = len(items)
     neighor_finder = NeighborFinder(ratings)
-    # time_encoder = time_encoding(config.time_dim)
-    time_encoder = TimeEncodeco(config.time_dim)
+    time_encoder = time_encoding(config.time_dim)
+    # time_encoder = TimeEncodeco(config.time_dim)
     MLPLayer = MergeLayer(config.embed_dim, config.embed_dim, config.embed_dim, 1)
 
     a_users = np.array(ratings['user_id'])
@@ -335,20 +340,61 @@ if __name__=='__main__':
                  config.embed_dim, device, config.n_head, config.drop_out
                  ).to(device)
 
+    ########################################################################################################
+    # pre-train stage
+    pre_train_data = pre_train_dataset(ratings.iloc[train_data], num_users, num_items, config.positive_num, config.negative_num, config.week_num)
+    pre_train_edges = pre_train_data.pre_train_edges
+    # print(pre_train_edges.shape, type(pre_train_edges))
+    # exit()
+    pre_train_edges = torch.from_numpy(pre_train_edges).to(device).long()
+    pre_train_edges = pre_train_edges.transpose(0, 1)
+    pre_train_dataloder = DataLoader(pre_train_data, config.batch_size, shuffle=True, pin_memory=True)
     optim = torch.optim.Adam(model.parameters(),lr=config.lr)
+    
+    itrs = 0
+    sum_loss=0
+    for epoch in range(config.pre_train_epochs):
+        model.train()
+        for idx, batch in enumerate(pre_train_dataloder):
+            optim.zero_grad()
+            anchor_item, poitive_item_neighbors, weak_popular_items, negative_item_neighbors = batch
+            anchor_item = anchor_item.to(device)
+            poitive_item_neighbors = poitive_item_neighbors.to(device)
+            weak_popular_items = weak_popular_items.to(device)
+            negative_item_neighbors = negative_item_neighbors.to(device)
+            # print(anchor_item.shape, poitive_item_neighbors.shape, weak_popular_items.shape, negative_item_neighbors.shape)
+            loss = model.pre_train_embedding(anchor_item, poitive_item_neighbors, weak_popular_items, negative_item_neighbors, pre_train_edges)
+            # print(loss)
+            # exit()
+            loss.backward()
+            optim.step()
+            
+            itrs += 1
+            #time1 = time1 + (time.time() - time0)
+            #print('time:'+str(time1 / x))
 
+            sum_loss = sum_loss + loss.item()
+            avg_loss = sum_loss / itrs 
+            
+            if idx%50==0:
+                print("===>({}/{}, {}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(idx, len(pre_train_dataloder), epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
+        
+        print("===>({}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
+    exit()         
+    ########################################################################################################
+
+
+
+    optim = torch.optim.Adam(model.parameters(),lr=config.lr)
     num_params = 0
     for param in model.parameters():
         num_params += param.numel()
     print(num_params)
-    
     # 训练集分为不同batch
     dl = DataLoader(train_data, config.batch_size, shuffle=True, pin_memory=True)
-    
     # val_bl = DataLoader(valid_data, 5, shuffle=True, pin_memory=True)
     # recall5, recall10, NDCG5, NDCG10 = evaluate_val(model, ratings, items, val_bl, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device)
     # exit()    
-        
     # print('Epoch %d test' % epoch)
     ###################################################################################################################
     # 直接加载测试，少用
@@ -364,7 +410,6 @@ if __name__=='__main__':
     # recall5, recall10, NDCG5, NDCG10 = evaluate_val(model, ratings, items, test_bl1, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device)
     # exit()
     ##################################################################################################################
-    
     itrs = 0
     sum_loss=0
     for epoch in range(config.n_epoch):
@@ -426,7 +471,7 @@ if __name__=='__main__':
             sum_loss = sum_loss + loss.item()
             avg_loss = sum_loss / itrs 
                    
-            if id%10==0:
+            if id%50==0:
                 print("===>({}/{}, {}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(id, len(dl), epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
         
         print("===>({}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))

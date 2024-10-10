@@ -6,6 +6,7 @@ import torch.nn.init as init
 import torch.nn.functional as F
 from torch_geometric.nn.inits import glorot
 from torch.nn import Parameter
+from torch_geometric.nn import GATConv
 
 class PositionalEncoding(nn.Module):
     def __init__(self, dim_model, max_length=2000):
@@ -349,4 +350,24 @@ class TemporalAttentionLayer(torch.nn.Module):
 
     return attn_output, attn_output_weights
 
+class BipartiteGAT(torch.nn.Module):
+    def __init__(self, in_channels, hidden_channels, out_channels, heads=1, dropout=0.6):
+        super(BipartiteGAT, self).__init__()
+     
+        self.gat1 = GATConv(in_channels, hidden_channels, heads=heads, dropout=dropout)
+       
+        self.gat2 = GATConv(hidden_channels * heads, out_channels, heads=1, concat=False, dropout=dropout)
 
+        self.dropout = dropout
+
+    def forward(self, x, edge_index):
+        # 第一层 GAT 计算用户和项目的表示
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.gat1(x, edge_index)
+        x = F.elu(x)
+        
+        # 第二层 GAT 继续处理
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.gat2(x, edge_index)
+        
+        return x

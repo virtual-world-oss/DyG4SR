@@ -3,6 +3,8 @@ import pandas as pd
 import torch
 import os
 import random
+from torch.utils.data import Dataset, DataLoader
+import networkx as nx
 
 class NeighborFinder:
     def __init__(self, ratings):
@@ -294,6 +296,92 @@ def data_partition(fname):
     
     return ratings, train_data, valid_data, test_data, user_ids_invmap, item_ids_invmap
 
+
+class pre_train_dataset(Dataset):
+    def __init__(self, train_data, num_users, num_items, positive_num, negative_num, weak_positive_num):
+        self.train_data = train_data
+        self.num_users = num_users
+        self.num_items = num_items
+        self.positive_num = positive_num
+        self.negative_num = negative_num
+        self.weak_positive_num = weak_positive_num
+        self.make_graph()
+
+    def make_graph(self):
+        # print(self.train_data.shape)
+        # print(self.train_data.columns)
+        self.train_data.loc[:, 'item_id'] = self.train_data['item_id'] + self.num_users
+        # self.pre_train_graph = np.array(self.train_data[['user_id', 'item_id']].values.tolist(), dtype=np.int32)
+        # print(self.pre_train_graph.shape)
+        
+        self.users = self.train_data['user_id'].unique()
+        self.items = self.train_data['item_id'].unique() 
+        # print(min(self.users), max(self.users))
+        # print(min(self.items), max(self.items))
+        # print(self.num_items, self.num_users)
+        # print(type(self.items))
+        
+        pre_train_graph = nx.Graph()
+        pre_train_graph.add_nodes_from(self.users)
+        pre_train_graph.add_nodes_from(self.items)
+        self.pre_train_edges = np.array(self.train_data[['user_id', 'item_id']].values.tolist())
+        pre_train_graph.add_edges_from(np.array(self.train_data[['user_id', 'item_id']].values.tolist()))
+        self.pre_train_graph = pre_train_graph
+        
+        degree_dict = dict(self.pre_train_graph.degree)
+        item_degrees = {node: degree for node, degree in degree_dict.items() if node in self.items}
+        sorted_items = sorted(item_degrees.items(), key=lambda x: x[1], reverse=True)
+        self.popular_items = [item[0] for item in sorted_items]
+
+        
+
+    def find_second_order_neighbors(self, node):
+        # 获取 node 的一阶邻居
+        first_order_neighbors = set(nx.neighbors(self.pre_train_graph, node))
+        # 获取一阶邻居的邻居（即二阶邻居）
+        second_order_neighbors = set()
+        for neighbor in first_order_neighbors:
+            second_order_neighbors.update(set(nx.neighbors(self.pre_train_graph, neighbor)))
+        # 移除原节点和其一阶邻居，只保留真正的二阶邻居
+        second_order_neighbors.discard(node)
+        second_order_neighbors.difference_update(first_order_neighbors)
+        return list(second_order_neighbors)
+
+    def __len__(self):
+        return len(self.items)
+
+    def __getitem__(self, idx):
+        anchor_item = self.items[idx]
+        poitive_item_neighbors = self.find_second_order_neighbors(anchor_item)
+        random.shuffle(poitive_item_neighbors)
+        if len(poitive_item_neighbors) >= self.positive_num:
+            poitive_item_neighbors = poitive_item_neighbors[:self.positive_num]
+        else:
+            poitive_item_neighbors = poitive_item_neighbors + [anchor_item] * (self.positive_num - len(poitive_item_neighbors))
+        
+        weak_popular_items = []
+        for item in self.popular_items:
+            if item != anchor_item and item not in poitive_item_neighbors:
+                weak_popular_items.append(item)
+                if len(weak_popular_items) >= self.weak_positive_num:
+                    break
+        # if len(weak_popular_items) < self.weak_popular_num:
+        
+        negative_item_neighbors = set(self.items) - set(poitive_item_neighbors) - set(weak_popular_items) - set([anchor_item])
+        negative_item_neighbors = list(negative_item_neighbors)
+        random.shuffle(negative_item_neighbors)
+        if len(negative_item_neighbors) >= self.negative_num:
+            negative_item_neighbors = negative_item_neighbors[:self.negative_num]
+        
+        
+        # print(anchor_item.shape, poitive_item_neighbors.shape, weak_popular_items.shape, negative_item_neighbors.shape)
+        poitive_item_neighbors = torch.tensor(poitive_item_neighbors, dtype=torch.long)
+        weak_popular_items = torch.tensor(weak_popular_items, dtype=torch.long)
+        negative_item_neighbors = torch.tensor(negative_item_neighbors, dtype=torch.long)
+        anchor_item = torch.tensor(anchor_item, dtype=torch.long)
+        return anchor_item, poitive_item_neighbors, weak_popular_items, negative_item_neighbors
+
+    
+    
 if __name__ == '__main__':
     ratings, train_data, valid_data, test_data = data_partition('data/movielens/ml-1m')
-

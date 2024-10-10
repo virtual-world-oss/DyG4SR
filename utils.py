@@ -8,7 +8,109 @@ import pickle as pkl
 import torch
 import torch.nn.functional as F
 
+# def hierarchical_contrastive_loss(e_i, P_i, N_i, weak_P_i, tau):
+#     """
+#     Hierarchical contrastive loss with a separate weak positive set.
 
+#     Args:
+#         e_i (torch.Tensor): Anchor embeddings, shape (B, D)
+#         P_i (torch.Tensor): Positive set embeddings, shape (B, P, D)
+#         weak_P_i (torch.Tensor): Weak positive set embeddings, shape (B, W, D)
+#         N_i (torch.Tensor): Negative set embeddings, shape (B, N, D)
+#         tau (float): Temperature parameter
+    
+#     Returns:
+#         loss (torch.Tensor): Computed hierarchical contrastive loss, shape (B,)
+#     """
+#     # Compute dot products with positive, weak positive, and negative examples
+#     e_i_P_i = torch.matmul(e_i.unsqueeze(1), P_i.transpose(1, 2)) / tau  # Shape (B, 1, P)
+#     e_i_weak_P_i = torch.matmul(e_i.unsqueeze(1), weak_P_i.transpose(1, 2)) / tau  # Shape (B, 1, W)
+#     e_i_N_i = torch.matmul(e_i.unsqueeze(1), N_i.transpose(1, 2)) / tau  # Shape (B, 1, N)
+    
+#     # Squeeze to make sure the shapes are correct
+#     e_i_P_i = e_i_P_i.squeeze(1)  # Shape (B, P)
+#     e_i_weak_P_i = e_i_weak_P_i.squeeze(1)  # Shape (B, W)
+#     e_i_N_i = e_i_N_i.squeeze(1)  # Shape (B, N)
+    
+#     # Apply clamp to prevent overflow
+#     e_i_P_i = torch.clamp(e_i_P_i, max=709)  # Clamp to avoid overflow in exp
+#     e_i_weak_P_i = torch.clamp(e_i_weak_P_i, max=709)  # Clamp to avoid overflow in exp
+#     e_i_N_i = torch.clamp(e_i_N_i, max=709)  # Clamp to avoid overflow in exp
+    
+#     # First term: log of positive over sum of all positives + negatives + weak positives
+#     numerator_1 = torch.exp(e_i_P_i).sum(dim=1)  # Shape (B,)
+#     denominator_1 = numerator_1 + torch.exp(e_i_N_i).sum(dim=1) + torch.exp(e_i_weak_P_i).sum(dim=1)  # Shape (B,)
+#     print(torch.exp(e_i_P_i))
+    
+#     # Apply clamp to denominator to prevent division by zero
+#     denominator_1 = torch.clamp(denominator_1, min=1e-8)  # Prevent division by zero
+#     loss_1 = -torch.log(numerator_1 / denominator_1)
+    
+#     # Second term: log of weak positive min(M_i) and positive over sum of all positives + negatives + weak positives
+#     M_i = e_i_P_i.min(dim=1).values  # Shape (B,) 正例集合中的最小相似度
+    
+#     # Apply clamp to M_i to avoid overflow
+#     M_i = torch.clamp(M_i, max=709)  # Clamp to avoid overflow in exp
+#     min_term = torch.min(M_i.unsqueeze(1), e_i_weak_P_i)  # Shape (B, W)
+    
+#     numerator_2 = torch.exp(min_term).sum(dim=1)  # Shape (B,)
+#     denominator_2 = torch.exp(e_i_P_i).sum(dim=1) + torch.exp(e_i_N_i).sum(dim=1) + torch.exp(e_i_weak_P_i).sum(dim=1)  # Shape (B,)
+    
+#     # Apply clamp to denominator to prevent division by zero
+#     denominator_2 = torch.clamp(denominator_2, min=1e-8)  # Prevent division by zero
+#     loss_2 = -torch.log(numerator_2 / denominator_2)
+    
+#     # Total loss is the sum of both terms
+#     total_loss = loss_1 + loss_2
+#     return total_loss
+
+
+
+def hierarchical_contrastive_loss(e_i, P_i, N_i, weak_P_i, tau=0.1):
+    """
+    Hierarchical contrastive loss with a separate weak positive set.
+
+    Args:
+        e_i (torch.Tensor): Anchor embeddings, shape (B, D)
+        P_i (torch.Tensor): Positive set embeddings, shape (B, P, D)
+        weak_P_i (torch.Tensor): Weak positive set embeddings, shape (B, W, D)
+        N_i (torch.Tensor): Negative set embeddings, shape (B, N, D)
+        tau (float): Temperature parameter
+    
+    Returns:
+        loss (torch.Tensor): Computed hierarchical contrastive loss, shape (B,)
+    """
+    # Compute dot products with positive, weak positive, and negative examples
+    e_i_P_i = torch.matmul(e_i.unsqueeze(1), P_i.transpose(1, 2)) / tau  # Shape (B, 1, P)
+    e_i_weak_P_i = torch.matmul(e_i.unsqueeze(1), weak_P_i.transpose(1, 2)) / tau  # Shape (B, 1, W)
+    e_i_N_i = torch.matmul(e_i.unsqueeze(1), N_i.transpose(1, 2)) / tau  # Shape (B, 1, N)
+    # print(e_i_P_i)
+    # print(e_i_weak_P_i)
+    # print(e_i_N_i)
+    
+    # Squeeze to make sure the shapes are correct
+    e_i_P_i = e_i_P_i.squeeze(1)  # Shape (B, P)
+    e_i_weak_P_i = e_i_weak_P_i.squeeze(1)  # Shape (B, W)
+    e_i_N_i = e_i_N_i.squeeze(1)  # Shape (B, N)
+    
+    # First term: log of positive over sum of all positives + negatives + weak positives
+    numerator_1 = torch.exp(e_i_P_i).sum(dim=1)  # Shape (B,)
+    denominator_1 = numerator_1 + torch.exp(e_i_N_i).sum(dim=1) + torch.exp(e_i_weak_P_i).sum(dim=1)  # Shape (B,)
+    # print(torch.exp(e_i_P_i))
+    loss_1 = -torch.log(numerator_1 / denominator_1)
+    # print(loss_1)
+    
+    # Second term: log of weak positive min(M_i) and positive over sum of all positives + negatives + weak positives
+    M_i = e_i_P_i.min(dim=1).values  # Shape (B,) 正例集合中的最小相似度
+    min_term = torch.min(M_i.unsqueeze(1), e_i_weak_P_i)  # Shape (B, W)
+    numerator_2 = torch.exp(min_term).sum(dim=1)  # Shape (B,)
+    denominator_2 = torch.exp(e_i_P_i).sum(dim=1) + torch.exp(e_i_N_i).sum(dim=1) + torch.exp(e_i_weak_P_i).sum(dim=1)  # Shape (B,)
+    loss_2 = -torch.log(numerator_2 / denominator_2)
+    
+    # Total loss is the sum of both terms
+    total_loss = loss_1 + loss_2
+    return total_loss.mean()
+    
 
 
 def contrastive_loss(X, Y):
