@@ -217,7 +217,7 @@ def data_partition(fname):
         user_count = ratings['user_id'].value_counts()
         user_count.name = 'user_count'
         ratings = ratings.join(user_count, on='user_id')
-        ratings = ratings[(ratings['user_count'] >= 5) & (ratings['item_count'] >= 5)]
+        ratings = ratings[(ratings['user_count'] >= 10) & (ratings['item_count'] >= 10)]
 
         if len(ratings['user_id'].unique()) == len(users) and len(ratings['item_id'].unique()) == len(items):
             break
@@ -239,7 +239,7 @@ def data_partition(fname):
     user_count = ratings['user_id'].value_counts()
     user_count.name = 'user_count'
     ratings = ratings.join(user_count, on='user_id')
-    ratings = ratings[(ratings['user_count'] >=5) & (ratings['item_count'] >= 5)]
+    ratings = ratings[(ratings['user_count'] >= 10) & (ratings['item_count'] >= 10)]
 
     users = ratings['user_id'].unique()
     items = ratings['item_id'].unique()

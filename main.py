@@ -18,9 +18,9 @@ from datetime import datetime
 class Config(object):
     """config."""
     # data = 'Moivelens'
-    data = 'beauty'
-    data_path = './data/beauty'
-    data_raw = False
+    data = 'CDs'
+    data_path = './data/CDs'
+    data_raw = True
     batch_size = 64 # batch_size = 256, origin=64, [64,128,256,1024]
     n_degree = [20,50]  #'Number of neighbors to sample'
     num_shots = 2 # num_shots = 2, origin=2, [2,5,10]
@@ -267,7 +267,7 @@ if __name__=='__main__':
     print("Finishing Gen Dataset")
     # exit()
     print(ratings.shape)
-    # exit()
+    exit()
     
     users = ratings['user_id'].unique()
     items = ratings['item_id'].unique() 
