@@ -11,6 +11,8 @@ import pickle as pkl
 import os
 from tqdm import tqdm
 
+from datetime import datetime
+
 # from utils import get_ddygs
 
 class Config(object):
@@ -36,12 +38,13 @@ class Config(object):
     temperature = 0.07
     valid_batch_size = 64
     test_batch_size = 64
-    lambda1 = 0.3
-    lambda2 = 0.3
+    lambda1 = 0.2
+    lambda2 = 0.2
     positive_num = 5
     negative_num = 15
     week_num = 5
-    pre_train_epochs = 3
+    pre_train_epochs = 10
+    pre_batch_size = 1024
     
 def evaluate_val(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device):
      # 准备工作
@@ -221,6 +224,10 @@ if __name__=='__main__':
     # best_epoch = 0
     max_itrs = 0
     
+    current_time = datetime.now()
+    model_pth = f"model_{current_time.strftime('%Y-%m-%d %H:%M:%S')}.pth"
+
+    
     device_string = 'cuda' if torch.cuda.is_available() else 'cpu'
     # device_string = 'cpu'
     device = torch.device(device_string)
@@ -348,7 +355,7 @@ if __name__=='__main__':
     # exit()
     pre_train_edges = torch.from_numpy(pre_train_edges).to(device).long()
     pre_train_edges = pre_train_edges.transpose(0, 1)
-    pre_train_dataloder = DataLoader(pre_train_data, config.batch_size, shuffle=True, pin_memory=True)
+    pre_train_dataloder = DataLoader(pre_train_data, config.pre_batch_size, shuffle=True, pin_memory=True)
     optim = torch.optim.Adam(model.parameters(),lr=config.lr)
     
     itrs = 0
@@ -380,7 +387,7 @@ if __name__=='__main__':
                 print("===>({}/{}, {}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(idx, len(pre_train_dataloder), epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
         
         print("===>({}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
-    exit()         
+    # exit()         
     ########################################################################################################
 
 
@@ -492,7 +499,7 @@ if __name__=='__main__':
         if max_NDCG10 < NDCG10:
             max_NDCG10 = NDCG10
             max_itrs = 0
-            torch.save(model.state_dict(), "model_full.pth")
+            torch.save(model.state_dict(), os.path.join("ckpt",config.data, model_pth))
         else:   
             max_itrs += 1
             if max_itrs>config.patience:
@@ -507,7 +514,7 @@ if __name__=='__main__':
                  time_encoder, config.n_layer,  config.n_degree, config.node_dim, config.time_dim,
                  config.embed_dim, device, config.n_head, config.drop_out
                  ).to(device)
-    model.load_state_dict(torch.load("model_full.pth"))
+    model.load_state_dict(torch.load(os.path.join("ckpt",config.data, model_pth)))
     model.eval()
     test_bl1 = DataLoader(test_data, 5, shuffle=True, pin_memory=True)
     # recall5, recall10, NDCG5, NDCG10 = evaluate(model, ratings, items, test_bl1, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device)
