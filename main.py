@@ -18,8 +18,8 @@ from datetime import datetime
 class Config(object):
     """config."""
     # data = 'Moivelens'
-    data = 'beauty'
-    data_path = './data/beauty'
+    data = 'ml-1m'
+    data_path = './data/ml-1m'
     data_raw = False
     batch_size = 64 # batch_size = 256, origin=64, [64,128,256,1024]
     n_degree = [20,50]  #'Number of neighbors to sample'
