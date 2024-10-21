@@ -12,10 +12,26 @@ import os
 from tqdm import tqdm
 
 from datetime import datetime
+import argparse
+import logging 
+
+parser = argparse.ArgumentParser(description="logger")
+parser.add_argument('--logfile', type=str, required=False, help="log file")
+args = parser.parse_args()
+
+logger = logging.getLogger("my_logger")
+logger.setLevel(logging.INFO)
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+file_handler = logging.FileHandler(args.logfile)
+file_handler.setLevel(logging.INFO)
+
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
 
 # from utils import get_ddygs
 seed = 42
-
 class Config(object):
     """config."""
     # data = 'Moivelens'
@@ -48,7 +64,7 @@ class Config(object):
     pre_train_epochs = 10
     pre_batch_size = 1024
     
-def evaluate_val(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device, config):
+def evaluate_val(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device):
      # 准备工作
     torch.cuda.empty_cache()
     NDCG5 = 0.0
@@ -101,7 +117,7 @@ def evaluate_val(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_us
         NDCG5 = NDCG5/num_sample
         NDCG10 = NDCG10/num_sample
             
-        print("===> recall_5: {:.10f}, recall_10: {:.10f}, NDCG_5: {:.10f}, NDCG_10: {:.10f}, time:{}".format(recall5, recall10, NDCG5, NDCG10, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
+        logger.info("===> recall_5: {:.10f}, recall_10: {:.10f}, NDCG_5: {:.10f}, NDCG_10: {:.10f}, time:{}".format(recall5, recall10, NDCG5, NDCG10, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
 
     return recall5, recall10, NDCG5, NDCG10
 
@@ -171,7 +187,7 @@ def evaluate(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_t
         NDCG5 = NDCG5/num_sample
         NDCG10 = NDCG10/num_sample
             
-        print("===> recall_5: {:.10f}, recall_10: {:.10f}, NDCG_5: {:.10f}, NDCG_10: {:.10f}, time:{}".format(recall5, recall10, NDCG5, NDCG10, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
+        logger.info("===> recall_5: {:.10f}, recall_10: {:.10f}, NDCG_5: {:.10f}, NDCG_10: {:.10f}, time:{}".format(recall5, recall10, NDCG5, NDCG10, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
 
     return recall5, recall10, NDCG5, NDCG10
 
@@ -179,11 +195,11 @@ def evaluate(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_t
 def sampler_global(items, adj_user, b_users, size, b_items=None):
     #################################
     # 设置各个模块的seed
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+    # random.seed(seed)
+    # np.random.seed(seed)
+    # torch.manual_seed(seed)
+    # torch.cuda.manual_seed(seed)
+    # torch.cuda.manual_seed_all(seed)
     #################################
     negs = []
     for i in range(len(b_users)):      
@@ -197,11 +213,11 @@ def sampler_global(items, adj_user, b_users, size, b_items=None):
 def sampler(items, adj_user, b_users, size):
     #################################
     # 设置各个模块的seed
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+    # random.seed(seed)
+    # np.random.seed(seed)
+    # torch.manual_seed(seed)
+    # torch.cuda.manual_seed(seed)
+    # torch.cuda.manual_seed_all(seed)
     #################################
     negs = []
     for user in b_users:      
@@ -261,10 +277,10 @@ if __name__=='__main__':
     # device_string = 'cpu'
     device = torch.device(device_string)
 
-    print("loading the dataset...")
+    logger.info("loading the dataset...")
     # ratings, train_data, valid_data, test_data = data_partition('data/ml-1m')
     if config.data_raw:
-        ratings, train_data, valid_data, test_data, user_ids_invmap, item_ids_invmap = data_partition(config.data_path, config)
+        ratings, train_data, valid_data, test_data, user_ids_invmap, item_ids_invmap = data_partition(config.data_path, config, logger)
         with open(os.path.join(config.data_path,'ratings.pkl'),'wb') as f:
             pkl.dump(ratings,f)
         with open(os.path.join(config.data_path,'train_data.pkl'),'wb') as f:
@@ -293,9 +309,9 @@ if __name__=='__main__':
             item_ids_invmap = pkl.load(f)
 
 
-    print("Finishing Gen Dataset")
+    logger.info("Finishing Gen Dataset")
     # exit()
-    print(ratings.shape)
+    logger.info(f"Ratings shape: {ratings.shape}")
     # exit()
     
     users = ratings['user_id'].unique()
@@ -334,7 +350,7 @@ if __name__=='__main__':
     ###########################################
     # for discrete dyg
     # ddyg: list, and each element is a subset of ratings with index unchanged
-    print('Generating discrete dygs and related info')
+    logger.info('Generating discrete dygs and related info')
     with open(os.path.join(config.data_path, 'ddygs.pkl'), 'rb') as f:
         ddygs = pkl.load(f)
     
@@ -413,9 +429,9 @@ if __name__=='__main__':
             avg_loss = sum_loss / itrs 
             
             if idx%50==0:
-                print("===>({}/{}, {}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(idx, len(pre_train_dataloder), epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
+                logger.info("===>({}/{}, {}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(idx, len(pre_train_dataloder), epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
         
-        print("===>({}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
+        logger.info("===>({}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
     # exit()         
     ########################################################################################################
 
@@ -425,7 +441,7 @@ if __name__=='__main__':
     num_params = 0
     for param in model.parameters():
         num_params += param.numel()
-    print(num_params)
+    logger.info(f"{num_params}")
     # 训练集分为不同batch
     dl = DataLoader(train_data, config.batch_size, shuffle=True, pin_memory=True)
     # val_bl = DataLoader(valid_data, 5, shuffle=True, pin_memory=True)
@@ -508,9 +524,9 @@ if __name__=='__main__':
             avg_loss = sum_loss / itrs 
                    
             if id%50==0:
-                print("===>({}/{}, {}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(id, len(dl), epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
+                logger.info("===>({}/{}, {}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(id, len(dl), epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
         
-        print("===>({}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
+        logger.info("===>({}): loss: {:.10f}, avg_loss: {:.10f}, time:{}".format(epoch, loss.item(), avg_loss, time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
              
             
         ### Validation
@@ -537,7 +553,7 @@ if __name__=='__main__':
     # print(f'best_recall@10:{max_recall10}')
 
     # torch.save(model.state_dict(), "model_full.pth")
-    print('Epoch %d test' % epoch)
+    logger.info('Epoch %d test' % epoch)
     model = DyG4SR(user_neig50, item_neig50, ddyg_user_neig50, ddyg_item_neig50, config.num_shots, ddyg_edges_idx,
                  num_users, num_items,
                  time_encoder, config.n_layer,  config.n_degree, config.node_dim, config.time_dim,

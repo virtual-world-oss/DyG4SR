@@ -190,7 +190,7 @@ class NeighborFinder:
         )
 
 
-def data_partition(fname, config=None):
+def data_partition(fname, config=None, logger=None):
     
     if config == None:
         seed = 2024
@@ -283,9 +283,9 @@ def data_partition(fname, config=None):
     ratings['item_id'] = ratings['item_id'].map(item_ids_invmap)
 
 
-    print('user_count:'+str(len(users))+','+'item_count:'+str(len(items)))
-    print('avr of user:'+str(ratings['user_id'].value_counts().mean())+'avr of item:'+str(ratings['item_id'].value_counts().mean()))
-    print(len(ratings))
+    logger.info('user_count:'+str(len(users))+','+'item_count:'+str(len(items)))
+    logger.info('avr of user:'+str(ratings['user_id'].value_counts().mean())+'avr of item:'+str(ratings['item_id'].value_counts().mean()))
+    logger.info(f"{len(ratings)}")
 
     users = ratings['user_id'].unique()
     items = ratings['item_id'].unique()
@@ -319,7 +319,7 @@ def data_partition(fname, config=None):
     del ratings['rating']
     del ratings['user_count']
     del ratings['item_count']
-    print(ratings.columns)
+    logger.info(f"{ratings.columns}")
     
     return ratings, train_data, valid_data, test_data, user_ids_invmap, item_ids_invmap
 
