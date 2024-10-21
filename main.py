@@ -14,10 +14,12 @@ from tqdm import tqdm
 from datetime import datetime
 
 # from utils import get_ddygs
+seed = 42
 
 class Config(object):
     """config."""
     # data = 'Moivelens'
+    seed = 42
     data = 'beauty'
     data_path = './data/beauty'
     data_raw = False
@@ -38,15 +40,15 @@ class Config(object):
     temperature = 0.07
     valid_batch_size = 64
     test_batch_size = 64
-    lambda1 = 0.2
-    lambda2 = 0.2
+    lambda1 = 0.1
+    lambda2 = 0.1
     positive_num = 5
     negative_num = 15
     week_num = 5
     pre_train_epochs = 10
     pre_batch_size = 1024
     
-def evaluate_val(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device):
+def evaluate_val(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device, config):
      # 准备工作
     torch.cuda.empty_cache()
     NDCG5 = 0.0
@@ -175,6 +177,14 @@ def evaluate(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_t
 
 # liu:12.06-global neg sampler
 def sampler_global(items, adj_user, b_users, size, b_items=None):
+    #################################
+    # 设置各个模块的seed
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    #################################
     negs = []
     for i in range(len(b_users)):      
         houxuan = list(set(items)-set([b_items[i].item()]))
@@ -185,6 +195,14 @@ def sampler_global(items, adj_user, b_users, size, b_items=None):
 
 
 def sampler(items, adj_user, b_users, size):
+    #################################
+    # 设置各个模块的seed
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    #################################
     negs = []
     for user in b_users:      
         houxuan = list(set(items)-set(adj_user[user]))
@@ -217,6 +235,17 @@ def find_latest_1D(nodes, adj, adj_time, timestamps):
 if __name__=='__main__':
 
     config = Config()
+    seed = config.seed
+    
+    #################################
+    # 设置各个模块的seed
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    #################################
+    
     checkpoint_dir='/models'  
     min_NDCG10 = 1000.0
     max_recall10 = 0.0
@@ -235,7 +264,7 @@ if __name__=='__main__':
     print("loading the dataset...")
     # ratings, train_data, valid_data, test_data = data_partition('data/ml-1m')
     if config.data_raw:
-        ratings, train_data, valid_data, test_data, user_ids_invmap, item_ids_invmap = data_partition(config.data_path)
+        ratings, train_data, valid_data, test_data, user_ids_invmap, item_ids_invmap = data_partition(config.data_path, config)
         with open(os.path.join(config.data_path,'ratings.pkl'),'wb') as f:
             pkl.dump(ratings,f)
         with open(os.path.join(config.data_path,'train_data.pkl'),'wb') as f:
@@ -282,7 +311,7 @@ if __name__=='__main__':
     
     num_users = len(users)
     num_items = len(items)
-    neighor_finder = NeighborFinder(ratings)
+    neighor_finder = NeighborFinder(ratings,config)
     time_encoder = time_encoding(config.time_dim)
     # time_encoder = TimeEncodeco(config.time_dim)
     MLPLayer = MergeLayer(config.embed_dim, config.embed_dim, config.embed_dim, 1)
@@ -313,7 +342,7 @@ if __name__=='__main__':
     # for ddyg in ddygs:
     #     ddyg_index = ddyg.index
     # exit()
-    ddyg_neighor_finders = [NeighborFinder(ddyg) for ddyg in ddygs]
+    ddyg_neighor_finders = [NeighborFinder(ddyg,config) for ddyg in ddygs]
     
     # ddyg_time_encoders = [time_encoding(config.time_dim) for ddyg in ddygs]
     # ddyg_MLPLayers = [MergeLayer(config.embed_dim, config.embed_dim, config.embed_dim, 1) for ddyg in ddygs]
@@ -344,12 +373,12 @@ if __name__=='__main__':
     model = DyG4SR(user_neig50, item_neig50, ddyg_user_neig50, ddyg_item_neig50, config.num_shots, ddyg_edges_idx,
                  num_users, num_items,
                  time_encoder, config.n_layer,  config.n_degree, config.node_dim, config.time_dim,
-                 config.embed_dim, device, config.n_head, config.drop_out
+                 config.embed_dim, device, config.n_head, config.drop_out,config
                  ).to(device)
 
     ########################################################################################################
     # pre-train stage
-    pre_train_data = pre_train_dataset(ratings.iloc[train_data], num_users, num_items, config.positive_num, config.negative_num, config.week_num)
+    pre_train_data = pre_train_dataset(ratings.iloc[train_data], num_users, num_items, config.positive_num, config.negative_num, config.week_num,config)
     pre_train_edges = pre_train_data.pre_train_edges
     # print(pre_train_edges.shape, type(pre_train_edges))
     # exit()
@@ -467,7 +496,7 @@ if __name__=='__main__':
             logits = torch.cat([l_pos, l_u], dim=1)  # [count, 2]
             loss = criterion(logits/config.temperature, labels)
             
-            loss = loss + config.lambda1 * user_cl_loss + config.lambda1 * item_cl_loss
+            loss = loss + config.lambda1 * user_cl_loss + config.lambda2 * item_cl_loss
 
             loss.backward()
             optim.step()
@@ -512,7 +541,7 @@ if __name__=='__main__':
     model = DyG4SR(user_neig50, item_neig50, ddyg_user_neig50, ddyg_item_neig50, config.num_shots, ddyg_edges_idx,
                  num_users, num_items,
                  time_encoder, config.n_layer,  config.n_degree, config.node_dim, config.time_dim,
-                 config.embed_dim, device, config.n_head, config.drop_out
+                 config.embed_dim, device, config.n_head, config.drop_out,config
                  ).to(device)
     model.load_state_dict(torch.load(os.path.join("ckpt",config.data, model_pth)))
     model.eval()

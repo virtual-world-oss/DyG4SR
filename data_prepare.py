@@ -7,7 +7,7 @@ from torch.utils.data import Dataset, DataLoader
 import networkx as nx
 
 class NeighborFinder:
-    def __init__(self, ratings):
+    def __init__(self, ratings, config=None):
 
         ratings = ratings.reset_index(drop=True)
         self.ratings = np.array(ratings)
@@ -18,6 +18,19 @@ class NeighborFinder:
                              users}  # 用户的边ID集合
         self.item_edgeidx = {cur_item: np.array(ratings[ratings.item_id == cur_item].index.tolist()) for cur_item in
                              items}  # item的边ID集合
+        
+        if config == None:
+            seed = 2024
+        else:
+            seed = config.seed
+        #################################
+        # 设置各个模块的seed
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        #################################
 
     def get_user_neighbor(self, source_idx, timestamps, n_neighbors, device):
 
@@ -177,7 +190,21 @@ class NeighborFinder:
         )
 
 
-def data_partition(fname):
+def data_partition(fname, config=None):
+    
+    if config == None:
+        seed = 2024
+    else:
+        seed = config.seed
+    #################################
+    # 设置各个模块的seed
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    #################################
+    
     if "Beauty" in fname:
         ratings = pd.read_csv(fname,sep='\t')
         ratings = ratings.iloc[:,:4]
@@ -298,7 +325,21 @@ def data_partition(fname):
 
 
 class pre_train_dataset(Dataset):
-    def __init__(self, train_data, num_users, num_items, positive_num, negative_num, weak_positive_num):
+    def __init__(self, train_data, num_users, num_items, positive_num, negative_num, weak_positive_num, config=None):
+        
+        if config == None:
+            seed = 2024
+        else:
+            seed = config.seed
+        #################################
+        # 设置各个模块的seed
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        #################################
+        
         self.train_data = train_data
         self.num_users = num_users
         self.num_items = num_items
@@ -381,7 +422,6 @@ class pre_train_dataset(Dataset):
         anchor_item = torch.tensor(anchor_item, dtype=torch.long)
         return anchor_item, poitive_item_neighbors, weak_popular_items, negative_item_neighbors
 
-    
     
 if __name__ == '__main__':
     ratings, train_data, valid_data, test_data = data_partition('data/movielens/ml-1m')

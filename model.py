@@ -7,9 +7,22 @@ from torch_geometric.nn import GATConv
 class DyG4SR(nn.Module):
     def __init__(self, user_neig50, item_neig50, ddyg_user_neig50, ddyg_item_neig50, shots_num, ddyg_edges_idx, num_users, num_items, time_encoder, n_layers, n_neighbors,
                n_node_features, n_time_features, embedding_dimension, device,
-               n_heads=2, dropout=0.1):
+               n_heads=2, dropout=0.1, config=None):
         super(DyG4SR, self).__init__()
     
+        if config == None:
+            seed = 2024
+        else:
+            seed = config.seed
+        #################################
+        # 设置各个模块的seed
+        # random.seed(seed)
+        # np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        #################################
+
         self.num_users = num_users
         self.num_items = num_items
         self.shots_num = shots_num
