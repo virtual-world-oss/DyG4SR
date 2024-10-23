@@ -34,6 +34,7 @@ class DyG4SR(nn.Module):
         self.embedding_dimension = embedding_dimension
         self.device = device
         self.n_neighbors = n_neighbors
+        self.pre_train_dropout = config.pre_train_dropout
     
         self.user_embeddings = nn.Embedding(self.num_users, self.embedding_dimension)
         self.item_embeddings = nn.Embedding(self.num_items, self.embedding_dimension)
@@ -64,7 +65,7 @@ class DyG4SR(nn.Module):
         
         ###
         #for pre train
-        self.pretrain_GNN = BipartiteGAT(self.embedding_dimension, self.embedding_dimension, self.embedding_dimension, dropout=self.dropout)
+        self.pretrain_GNN = BipartiteGAT(self.embedding_dimension, self.embedding_dimension, self.embedding_dimension, dropout=self.pre_train_dropout)
 
     def compute_embedding(self, nodes, edges, timestamps, n_layers, nodetype='user'):
         """

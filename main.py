@@ -63,6 +63,8 @@ class Config(object):
     week_num = 5
     pre_train_epochs = 10
     pre_batch_size = 1024
+    eval_steps = 1
+    pre_train_dropout = 0.1
     
 def evaluate_val(model, ratings, items, dl, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device):
      # 准备工作
@@ -531,24 +533,18 @@ if __name__=='__main__':
             
         ### Validation
         # if epoch%5==0:
-        if epoch%3==0:
+        if epoch%config.eval_steps==0:
             val_bl = DataLoader(valid_data, 5, shuffle=True, pin_memory=True)
             recall5, recall10, NDCG5, NDCG10 = evaluate_val(model, ratings, items, val_bl, adj_user_edge, adj_item_edge, adj_user_time, adj_item_time, device)
-        
-        # if recall10 > max_recall10: 
-        #     max_recall10 = recall10
-        #     max_itrs = 0
-        # if min_NDCG10>NDCG10:
-        #     min_NDCG10 = NDCG10
-        #     max_itrs = 0
-        if max_NDCG10 < NDCG10:
-            max_NDCG10 = NDCG10
-            max_itrs = 0
-            torch.save(model.state_dict(), os.path.join("ckpt",config.data, model_pth))
-        else:   
-            max_itrs += 1
-            if max_itrs>config.patience:
-                break
+            
+            if max_NDCG10 < NDCG10:
+                max_NDCG10 = NDCG10
+                max_itrs = 0
+                torch.save(model.state_dict(), os.path.join("ckpt",config.data, model_pth))
+            else:   
+                max_itrs += config.eval_steps
+                if max_itrs>config.patience:
+                    break
             
     # print(f'best_recall@10:{max_recall10}')
 
